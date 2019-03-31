@@ -454,7 +454,6 @@
             '<(icu_gyp_path):icuuc',
           ],
         }],
-
       ],
     }, # v8_snapshot
     {
@@ -1710,7 +1709,6 @@
         '<(V8_ROOT)/src/wasm/function-compiler.h',
         '<(V8_ROOT)/src/wasm/graph-builder-interface.cc',
         '<(V8_ROOT)/src/wasm/graph-builder-interface.h',
-        '<(V8_ROOT)/src/wasm/js-to-wasm-wrapper-cache-inl.h',
         '<(V8_ROOT)/src/wasm/jump-table-assembler.cc',
         '<(V8_ROOT)/src/wasm/jump-table-assembler.h',
         '<(V8_ROOT)/src/wasm/leb-helper.h',
@@ -1741,7 +1739,6 @@
         '<(V8_ROOT)/src/wasm/wasm-feature-flags.h',
         '<(V8_ROOT)/src/wasm/wasm-features.cc',
         '<(V8_ROOT)/src/wasm/wasm-features.h',
-        '<(V8_ROOT)/src/wasm/wasm-import-wrapper-cache-inl.h',
         '<(V8_ROOT)/src/wasm/wasm-interpreter.cc',
         '<(V8_ROOT)/src/wasm/wasm-interpreter.h',
         '<(V8_ROOT)/src/wasm/wasm-js.cc',
@@ -2690,6 +2687,9 @@
           'toolsets': ['host'],
         }, {
           'toolsets': ['target'],
+        }],
+        ['OS=="win"', {
+          'defines': [ 'V8_TARGET_OS_WIN' ],
         }],
       ],
     }, # mksnapshot
