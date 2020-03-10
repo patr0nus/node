@@ -996,7 +996,7 @@ throw an error.
 <!-- YAML
 added: v8.0.0
 changes:
-  - version: REPLACEME
+  - version: v14.0.0
     pr-url: https://github.com/nodejs/node/pull/31672
     description: This is now defined as a shared symbol.
 -->
@@ -1891,7 +1891,7 @@ util.types.isWeakSet(new WeakSet());  // Returns true
 ### `util.types.isWebAssemblyCompiledModule(value)`
 <!-- YAML
 added: v10.0.0
-deprecated: REPLACEME
+deprecated: v14.0.0
 -->
 
 > Stability: 0 - Deprecated: Use `value instanceof WebAssembly.Module` instead.
