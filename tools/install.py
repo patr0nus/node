@@ -180,6 +180,7 @@ def headers(action):
     'src/node_buffer.h',
     'src/node_object_wrap.h',
     'src/node_version.h',
+    'src/node_api_embedding.h',
   ], 'include/node/')
 
   # Add the expfile that is created on AIX
