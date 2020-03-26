@@ -10,9 +10,13 @@ typedef struct {
   napi_addon_register_func reg_func;
   int instance_argc;
   const char** instance_argv;
+  void(*loop_func)();
+  void(*on_tick_func);
 } node_init_info;
 
 int node_main(const node_init_info* init_info);
+int node_tick();
+
 
 EXTERN_C_END
 

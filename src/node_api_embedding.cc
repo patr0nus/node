@@ -3,6 +3,7 @@
 #include "node.h"
 #include "uv.h"
 #include <assert.h>
+#include <thread>
 
 using node::ArrayBufferAllocator;
 using node::Environment;
@@ -17,6 +18,23 @@ using v8::MaybeLocal;
 using v8::SealHandleScope;
 using v8::Value;
 using v8::V8;
+
+namespace {
+  class UVPoller() {
+  private:
+    uv_loop_t* loop_;
+  public:
+    UVPoller(uv_loop_t* loop): loop_(loop) {
+      // Add dummy handle for libuv, otherwise libuv would quit when there is
+      // nothing to do.
+      uv_async_init(uv_loop_, &dummy_uv_handle_, nullptr);
+
+      // Start worker that will interrupt main loop when having uv events.
+      uv_sem_init(&embed_sem_, 0);
+      uv_thread_create(&embed_thread_, EmbedThreadRunner, this);
+    }
+  }
+}
 
 static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info* init_info) {
   std::vector<std::string> args(
@@ -70,7 +88,7 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
     if (loadenv_ret.IsEmpty())  // There has been a JS exception.
       return 1;
 
-    {
+    if (init_info->loop_func == nullptr) {
       SealHandleScope seal(isolate);
       bool more;
       do {
@@ -83,6 +101,12 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
         node::EmitBeforeExit(env.get());
         more = uv_loop_alive(&loop);
       } while (more == true);
+    }
+    else {
+      static std::thread polling_thread([] {
+
+      });
+      init_info->loop_func();
     }
 
     exit_code = node::EmitExit(env.get());
