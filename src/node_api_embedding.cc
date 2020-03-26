@@ -4,12 +4,13 @@
 #include "uv.h"
 #include <assert.h>
 
-#include <sys/select.h>
+#include "uv_poller/uv_poller.h"
 
 using node::ArrayBufferAllocator;
 using node::Environment;
 using node::IsolateData;
 using node::MultiIsolatePlatform;
+using node::uv_poller::UVPoller;
 using v8::Context;
 using v8::HandleScope;
 using v8::Isolate;
@@ -20,69 +21,32 @@ using v8::SealHandleScope;
 using v8::Value;
 using v8::V8;
 
-namespace {
-  class UVPoller {
-  private:
-    uv_loop_t* uv_loop_;
-    uv_async_t dummy_uv_handle_;
-  public:
-    UVPoller(const UVPoller&) = delete;
-    void operator=(const UVPoller&) = delete;
-
-    UVPoller(uv_loop_t* loop): uv_loop_(loop) {
-      uv_async_init(uv_loop_, &dummy_uv_handle_, nullptr);
-    }
-    void PlatformInit() {
-      uv_loop_->data = this;
-      uv_loop_->on_watcher_queue_updated = [](uv_loop_t* loop) {
-        UVPoller* self = static_cast<UVPoller*>(loop->data);
-        uv_async_send(&(self->dummy_uv_handle_));
-      };
-    }
-    void PlatformDeinit() {
-      uv_loop_->data = nullptr;
-    }
-    void PollEvents() {
-      struct timeval tv;
-      int timeout = uv_backend_timeout(uv_loop_);
-      if (timeout != -1) {
-        tv.tv_sec = timeout / 1000;
-        tv.tv_usec = (timeout % 1000) * 1000;
-      }
-
-      fd_set readset;
-      int fd = uv_backend_fd(uv_loop_);
-      FD_ZERO(&readset);
-      FD_SET(fd, &readset);
-
-      // Wait for new libuv events.
-      int r;
-      do {
-        r = select(fd + 1, &readset, nullptr, nullptr,
-                   timeout == -1 ? nullptr : &tv);
-      } while (r == -1 && errno == EINTR);
-    }
-
-    ~UVPoller() {
-      uv_close(reinterpret_cast<uv_handle_t*>(&dummy_uv_handle_), nullptr);
-      PlatformDeinit();
-    }
-  };
-}
-
 struct TickData {
   uv_loop_t* loop;
   MultiIsolatePlatform* platform;
   Isolate* isolate;
   Environment* env;
   bool more;
+  uv_sem_t* finish_sem;
 };
 
-static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info* init_info) {
+static void NodeTick(TickData* tickData) {
+  uv_run(tickData->loop, UV_RUN_NOWAIT);
+  tickData->platform->DrainTasks(tickData->isolate);
+  tickData->more = uv_loop_alive(tickData->loop);
+  if (tickData->more) return;
+
+  node::EmitBeforeExit(tickData->env);
+  tickData->more = uv_loop_alive(tickData->loop);
+}
+
+static int RunNodeInstance(
+  MultiIsolatePlatform* platform,
+  const node_init_info* init_info) {
   std::vector<std::string> args(
     init_info->instance_argv,
-    init_info->instance_argv + init_info->instance_argc
-  );
+    init_info->instance_argv + init_info->instance_argc);
+
   std::vector<std::string> exec_args { };
   int exit_code = 0;
   uv_loop_t loop;
@@ -124,8 +88,7 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
         node::FreeEnvironment);
 
     MaybeLocal<Value> loadenv_ret = node::LoadEnvironment(
-        env.get(), init_info->script
-    );
+        env.get(), init_info->script);
 
     if (loadenv_ret.IsEmpty())  // There has been a JS exception.
       return 1;
@@ -137,36 +100,43 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
         platform,
         isolate,
         env.get(),
-        true
+        true,  // more
+        nullptr  // finish_sem
       };
       if (init_info->loop_func == nullptr) {
         while (tick_data.more) {
-          node_tick(&tick_data);
+          NodeTick(&tick_data);
         }
-      }
-      else {
+      } else {
+        uv_sem_t tick_finish_sem;
+        uv_sem_init(&tick_finish_sem, 0);
+        tick_data.finish_sem = &tick_finish_sem;
+
         uv_thread_t polling_thread;
         struct PollingThreadData {
           std::unique_ptr<UVPoller> poller;
           void(*on_tick_func)(tick_data_t);
           TickData* tick_data;
-        } poolThreadData {
+        } polling_thread_data {
           std::make_unique<UVPoller>(&loop),
           init_info->on_tick_func,
           &tick_data
         };
 
         uv_thread_create(&polling_thread, [](void* data) {
-          PollingThreadData* polling_thread_data = static_cast<PollingThreadData*>(data);
+          auto polling_thread_data = static_cast<PollingThreadData*>(data);
           while (polling_thread_data->tick_data->more) {
             polling_thread_data->poller->PollEvents();
             polling_thread_data->on_tick_func(polling_thread_data->tick_data);
+            uv_sem_wait(polling_thread_data->tick_data->finish_sem);
           }
-        }, &poolThreadData);
+        }, &polling_thread_data);
 
         init_info->loop_func();
 
+        uv_sem_post(&tick_finish_sem);
         uv_thread_join(&polling_thread);
+        uv_sem_destroy(&tick_finish_sem);
       }
     }
 
@@ -195,22 +165,14 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
 extern "C" {
 
 void node_tick(tick_data_t data) {
-  TickData* tickData = static_cast<TickData*>(data);
-
-  while (uv_run(tickData->loop, UV_RUN_NOWAIT) != 0) ;
-
-  tickData->platform->DrainTasks(tickData->isolate);
-  tickData->more = uv_loop_alive(tickData->loop);
-  if (tickData->more) return;
-
-  node::EmitBeforeExit(tickData->env);
-  tickData->more = uv_loop_alive(tickData->loop);
+  TickData* tick_data = static_cast<TickData*>(data);
+  NodeTick(tick_data);
+  uv_sem_post(tick_data->finish_sem);
 }
 
 int node_main(const node_init_info* init_info) {
   if (init_info->reg_func != nullptr) {
-      static napi_module module =
-      {
+      static napi_module module = {
         NAPI_MODULE_VERSION,
         0,
         __FILE__,

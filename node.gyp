@@ -734,6 +734,7 @@
         'src/udp_wrap.h',
         'src/util.h',
         'src/util-inl.h',
+        'src/uv_poller/uv_poller.h',
         # Dependency headers
         'deps/v8/include/v8.h',
         # javascript files to make for an even more pleasant IDE experience
@@ -934,6 +935,12 @@
                 '<@(_inputs)',
               ],
             },
+          ],
+        }],
+
+        [ 'OS in "mac"', {
+          'sources': [
+            'src/uv_poller/uv_poller_kqueue.cc',
           ],
         }],
       ],
