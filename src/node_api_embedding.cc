@@ -64,7 +64,7 @@ static int RunNodeInstance(MultiIsolatePlatform* platform, const node_init_info*
         node::FreeEnvironment);
 
     MaybeLocal<Value> loadenv_ret = node::LoadEnvironment(
-        env.get(), "console.log('preloaded!')"
+        env.get(), init_info->script
     );
 
     if (loadenv_ret.IsEmpty())  // There has been a JS exception.
@@ -125,11 +125,6 @@ int node_main(const node_init_info* init_info) {
   }
 
   std::vector<std::string> args { "node" };
-  if (init_info->eval) {
-    args.push_back("-e");
-  }
-  args.push_back(init_info->filename);
-
   std::vector<std::string> exec_args;
   std::vector<std::string> errors;
   int exit_code = node::InitializeNodeWithArgs(&args, &exec_args, &errors);

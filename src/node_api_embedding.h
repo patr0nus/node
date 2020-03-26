@@ -6,8 +6,7 @@
 EXTERN_C_START
 
 typedef struct {
-  const char* filename;
-  bool eval;
+  const char* script;
   napi_addon_register_func reg_func;
   int instance_argc;
   const char** instance_argv;
