@@ -31,8 +31,8 @@ void UVPoller::PollEvents() {
   struct timeval tv;
   int timeout = uv_backend_timeout(impl_->uv_loop_);
   if (timeout != -1) {
-  tv.tv_sec = timeout / 1000;
-  tv.tv_usec = (timeout % 1000) * 1000;
+    tv.tv_sec = timeout / 1000;
+    tv.tv_usec = (timeout % 1000) * 1000;
   }
 
   fd_set readset;
