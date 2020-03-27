@@ -919,9 +919,19 @@
           ],
         }],
 
-        [ 'OS in "mac"', {
+        [ 'OS in "mac ios freebsd openbsd"', {
           'sources': [
             'src/uv_poller/uv_poller_kqueue.cc',
+          ],
+        }],
+        [ 'OS in "linux android"', {
+          'sources': [
+            'src/uv_poller/uv_poller_epoll.cc',
+          ],
+        }],
+        [ 'OS not in "mac ios freebsd openbsd linux android"', {
+          'sources': [
+            'src/uv_poller/uv_poller_unsupported.cc',
           ],
         }],
       ],
