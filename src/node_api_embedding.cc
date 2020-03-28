@@ -87,6 +87,13 @@ static int RunNodeInstance(
         node::CreateEnvironment(isolate_data.get(), context, args, exec_args),
         node::FreeEnvironment);
 
+    bool has_loop_func = init_info->loop_func != nullptr;
+    std::unique_ptr<UVPoller> poller;
+    if (has_loop_func) {
+      // The poller must be setup before the very first tick.
+      poller = std::make_unique<UVPoller>(&loop);
+    }
+
     MaybeLocal<Value> loadenv_ret = node::LoadEnvironment(
         env.get(), init_info->script);
 
@@ -103,7 +110,7 @@ static int RunNodeInstance(
         true,  // more
         nullptr  // finish_sem
       };
-      if (init_info->loop_func == nullptr) {
+      if (!has_loop_func) {
         while (tick_data.more) {
           NodeTick(&tick_data);
         }
@@ -118,7 +125,7 @@ static int RunNodeInstance(
           void(*on_tick_func)(tick_data_t);
           TickData* tick_data;
         } polling_thread_data {
-          std::make_unique<UVPoller>(&loop),
+          std::move(poller),
           init_info->on_tick_func,
           &tick_data
         };
@@ -126,9 +133,9 @@ static int RunNodeInstance(
         uv_thread_create(&polling_thread, [](void* data) {
           auto polling_thread_data = static_cast<PollingThreadData*>(data);
           while (polling_thread_data->tick_data->more) {
-            polling_thread_data->poller->PollEvents();
             polling_thread_data->on_tick_func(polling_thread_data->tick_data);
             uv_sem_wait(polling_thread_data->tick_data->finish_sem);
+            polling_thread_data->poller->PollEvents();
           }
         }, &polling_thread_data);
 

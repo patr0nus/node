@@ -945,17 +945,17 @@ release-only: check-xz
 		echo 'Please update DEP...X in doc/api/deprecations.md (See doc/guides/releases.md)' ; \
 		exit 1 ; \
 	fi
-	@if [ "$(shell git status --porcelain | egrep -v '^\?\? ')" = "" ]; then \
-		exit 0 ; \
-	else \
-		echo "" >&2 ; \
-		echo "The git repository is not clean." >&2 ; \
-		echo "Please commit changes before building release tarball." >&2 ; \
-		echo "" >&2 ; \
-		git status --porcelain | egrep -v '^\?\?' >&2 ; \
-		echo "" >&2 ; \
-		exit 1 ; \
-	fi
+# 	@if [ "$(shell git status --porcelain | egrep -v '^\?\? ')" = "" ]; then \
+# 		exit 0 ; \
+# 	else \
+# 		echo "" >&2 ; \
+# 		echo "The git repository is not clean." >&2 ; \
+# 		echo "Please commit changes before building release tarball." >&2 ; \
+# 		echo "" >&2 ; \
+# 		git status --porcelain | egrep -v '^\?\?' >&2 ; \
+# 		echo "" >&2 ; \
+# 		exit 1 ; \
+# 	fi
 	@if [ "$(DISTTYPE)" != "release" -o "$(RELEASE)" = "1" ]; then \
 		exit 0; \
 	else \
