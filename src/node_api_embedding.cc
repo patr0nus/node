@@ -132,9 +132,12 @@ static int RunNodeInstance(
 
         uv_thread_create(&polling_thread, [](void* data) {
           auto polling_thread_data = static_cast<PollingThreadData*>(data);
-          while (polling_thread_data->tick_data->more) {
+          while (true) {
             polling_thread_data->on_tick_func(polling_thread_data->tick_data);
             uv_sem_wait(polling_thread_data->tick_data->finish_sem);
+            if (!polling_thread_data->tick_data->more) {
+              break;
+            }
             polling_thread_data->poller->PollEvents();
           }
         }, &polling_thread_data);
