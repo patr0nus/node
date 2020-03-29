@@ -1,22 +1,24 @@
 .NOTPARALLEL:
 
+OS := $(shell uname -s)
+
 MKFILE_DIR := $(abspath $(lastword $(MAKEFILE_LIST))/..)
 NODE_DIR := $(dir $(MKFILE_DIR))
 
-VERSION=$(shell python $(NODE_DIR)/tools/getnodeversion.py)
+VERSION := $(shell python $(NODE_DIR)/tools/getnodeversion.py)
 
 STAGE_DIR := $(MKFILE_DIR)/stage
 
-HEADERS=$(STAGE_DIR)/include.stamp
-HEADERS_DIR=$(STAGE_DIR)/include
+HEADERS := $(STAGE_DIR)/include.stamp
+HEADERS_DIR := $(STAGE_DIR)/include
 
-STATIC_LIBS=$(STAGE_DIR)/static_libs.stamp
-STATIC_LIBS_DIR=$(STAGE_DIR)/static_libs
+STATIC_LIBS := $(STAGE_DIR)/static_libs.stamp
+STATIC_LIBS_DIR := $(STAGE_DIR)/static_libs
 
-CMAKELISTS_FILE=$(MKFILE_DIR)/cmake/CMakeLists.txt
+CMAKELISTS_FILE := $(MKFILE_DIR)/cmake/CMakeLists.txt
 
-CMAKE_DIR=$(STAGE_DIR)/cmake
-CMAKE=$(CMAKE_DIR).stamp
+CMAKE_DIR := $(STAGE_DIR)/cmake
+CMAKE := $(CMAKE_DIR).stamp
 
 all: $(CMAKE)
 
@@ -40,9 +42,17 @@ $(STATIC_LIBS):
 	cd $(NODE_DIR) && ./configure --without-intl --enable-static --without-node-options --ninja
 	cd $(NODE_DIR) && ninja -C out/Release
 
+ifeq ($(OS), Linux)
+	@echo Converting thin archives...
+	@for f in $(shell find $(NODE_DIR)/out/Release/obj -type f -name '*.a'); do \
+		ar -t $$f | xargs ar rs $(STATIC_LIBS_DIR)/$$(basename $$f) ; \
+	done
+else
+	@echo Stripping archives...
 	@for f in $(foreach f, $(wildcard $(NODE_DIR)/out/Release/*.a), ${notdir $f}); do \
 		strip -x $(NODE_DIR)/out/Release/$$f -o ${STATIC_LIBS_DIR}/$$f; \
 	done
+endif	
 
 	cp $(NODE_DIR)/out/Release/obj/src/mkcodecache.*.o $(STATIC_LIBS_DIR)
 
