@@ -1,6 +1,11 @@
 .NOTPARALLEL:
 
 OS := $(shell uname -s)
+ifneq (,$(findstring NT,$(OS)))
+	OS := Windows
+endif
+
+WIN_ARCH := $(if $(WIN_X86),x86,x64)
 
 MKFILE_DIR := $(abspath $(lastword $(MAKEFILE_LIST))/..)
 NODE_DIR := $(dir $(MKFILE_DIR))
@@ -8,6 +13,8 @@ NODE_DIR := $(dir $(MKFILE_DIR))
 VERSION := $(shell python $(NODE_DIR)/tools/getnodeversion.py)
 
 STAGE_DIR := $(MKFILE_DIR)/stage
+
+BUILD_CONFIG := --without-intl --without-node-options
 
 HEADERS := $(STAGE_DIR)/include.stamp
 HEADERS_DIR := $(STAGE_DIR)/include
@@ -31,17 +38,22 @@ clean:
 
 $(HEADERS):
 	rm -rf $(HEADERS_DIR) && mkdir $(HEADERS_DIR)
-	cd $(NODE_DIR) && make tar-headers
-	tar -xf $(NODE_DIR)/node-v$(VERSION)-headers.tar.xz -C $(STAGE_DIR) --strip-components=1
-	rm $(NODE_DIR)/node-v$(VERSION)-headers.*
+	cd $(NODE_DIR) && HEADERS_ONLY=1 ./tools/install.py install "" "headers"
+	mv $(NODE_DIR)/headers/include $(STAGE_DIR)
 	touch $@
 
 $(STATIC_LIBS):
 	rm -rf $(STATIC_LIBS_DIR) && mkdir $(STATIC_LIBS_DIR)
 
-	cd $(NODE_DIR) && ./configure --without-intl --enable-static --without-node-options --ninja
+ifeq ($(OS), Windows)
+# 	cd $(NODE_DIR) && config_flags="$(BUILD_CONFIG)" ./vcbuild.bat static $(WIN_ARCH)
+	cp $(NODE_DIR)/out/Release/lib/*.lib $(STATIC_LIBS_DIR)
+	cp $(NODE_DIR)/out/Release/obj/mkcodecache/node_*.obj $(STATIC_LIBS_DIR)
+else
+	cd $(NODE_DIR) && ./configure --enable-static --ninja $(BUILD_CONFIG)
 	cd $(NODE_DIR) && ninja -C out/Release
 
+	cp $(NODE_DIR)/out/Release/obj/src/mkcodecache.*.o $(STATIC_LIBS_DIR)
 ifeq ($(OS), Linux)
 	@echo Converting thin archives...
 	@for f in $(shell find $(NODE_DIR)/out/Release/obj -type f -name '*.a'); do \
@@ -52,10 +64,9 @@ else
 	@for f in $(foreach f, $(wildcard $(NODE_DIR)/out/Release/*.a), ${notdir $f}); do \
 		strip -x $(NODE_DIR)/out/Release/$$f -o ${STATIC_LIBS_DIR}/$$f; \
 	done
-endif	
+endif
 
-	cp $(NODE_DIR)/out/Release/obj/src/mkcodecache.*.o $(STATIC_LIBS_DIR)
-
+endif
 	touch $@
 
 
@@ -68,7 +79,13 @@ $(CMAKE): $(CMAKELISTS_FILE) $(HEADERS) $(STATIC_LIBS)
 	touch $@
 
 .PHONY: test
-test: $(CMAKE) FORCE
-	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -S $(MKFILE_DIR)/cmake-test -B stage/test-build
-	make --directory stage/test-build all test
-FORCE:
+test: $(CMAKE)
+ifeq ($(OS), Windows)
+	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -A $(WIN_ARCH) -S $(MKFILE_DIR)/cmake-test -B $(STAGE_DIR)/test-build
+	cd $(STAGE_DIR)/test-build && cmake --build . --config Release
+	cd $(STAGE_DIR)/test-build && ctest -C Release
+else
+	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -GNinja -S $(MKFILE_DIR)/cmake-test -B $(STAGE_DIR)/test-build
+	cd $(STAGE_DIR)/test-build && ninja -C Release
+	cd $(STAGE_DIR)/test-build && ctest
+endif
