@@ -86,6 +86,6 @@ ifeq ($(OS), Windows)
 	cd $(STAGE_DIR)/test-build && ctest -C Release
 else
 	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -GNinja -S $(MKFILE_DIR)/cmake-test -B $(STAGE_DIR)/test-build
-	cd $(STAGE_DIR)/test-build && ninja -C Release
+	cd $(STAGE_DIR)/test-build && ninja
 	cd $(STAGE_DIR)/test-build && ctest
 endif
