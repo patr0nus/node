@@ -1,11 +1,23 @@
 .NOTPARALLEL:
 
-OS := $(shell uname -s)
-ifneq (,$(findstring NT,$(OS)))
-	OS := Windows
+UNAME_OS := $(shell uname -s)
+ifneq (,$(findstring NT,$(UNAME_OS)))
+	OS := win
+endif
+ifeq ($(UNAME_OS), Linux)
+	OS := linux
+endif
+ifeq ($(UNAME_OS), Darwin)
+	OS := darwin
 endif
 
-WIN_ARCH := $(if $(WIN_X86),x86,x64)
+DEST_ARCH ?= x64
+ifeq ($(DEST_ARCH), x64)
+	DEST_ARCH_X64 := 1
+endif
+ifeq ($(DEST_ARCH), x86)
+	DEST_ARCH_X86 := 1
+endif
 
 MKFILE_DIR := $(abspath $(lastword $(MAKEFILE_LIST))/..)
 NODE_DIR := $(dir $(MKFILE_DIR))
@@ -46,7 +58,7 @@ $(STATIC_LIBS):
 	rm -rf $(STATIC_LIBS_DIR) && mkdir $(STATIC_LIBS_DIR)
 
 ifeq ($(OS), Windows)
-# 	cd $(NODE_DIR) && config_flags="$(BUILD_CONFIG)" ./vcbuild.bat static $(WIN_ARCH)
+	cd $(NODE_DIR) && config_flags="$(BUILD_CONFIG)" ./vcbuild.bat static $(if $(DEST_ARCH_X86),x86,x64)
 	cp $(NODE_DIR)/out/Release/lib/*.lib $(STATIC_LIBS_DIR)
 	cp $(NODE_DIR)/out/Release/obj/mkcodecache/node_*.obj $(STATIC_LIBS_DIR)
 else
@@ -81,7 +93,7 @@ $(CMAKE): $(CMAKELISTS_FILE) $(HEADERS) $(STATIC_LIBS)
 .PHONY: test
 test: $(CMAKE)
 ifeq ($(OS), Windows)
-	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -A $(WIN_ARCH) -S $(MKFILE_DIR)/cmake-test -B $(STAGE_DIR)/test-build
+	cmake -DNODE_CMAKE_DIR=$(CMAKE_DIR) -A $(if $(DEST_ARCH_X86),Win32,x64) -S $(MKFILE_DIR)/cmake-test -B $(STAGE_DIR)/test-build
 	cd $(STAGE_DIR)/test-build && cmake --build . --config Release
 	cd $(STAGE_DIR)/test-build && ctest -C Release
 else
@@ -89,3 +101,11 @@ else
 	cd $(STAGE_DIR)/test-build && ninja
 	cd $(STAGE_DIR)/test-build && ctest
 endif
+
+
+TAR_PATH := $(STAGE_DIR)/$(TAR_FILENAME)
+
+.PHONY: tar
+tar: $(CMAKE)
+	@cd $(CMAKE_DIR) && tar -czf $(TAR_PATH) *
+	@echo $(TAR_PATH)
