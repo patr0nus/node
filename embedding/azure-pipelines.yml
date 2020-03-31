@@ -1,0 +1,31 @@
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    exclude:
+      - README.md
+
+
+jobs:
+  - job: Build
+    condition: ne(variables['NODE_PUBLISH'], '1')
+    strategy:
+      matrix:
+        linux:
+          imageName: 'ubuntu-18.04'
+        mac:
+          imageName: 'macOS-10.15'
+        win_x64:
+          imageName: 'windows-2019'
+        win_x86:
+          imageName: 'windows-2019'
+          DEST_ARCH: 'x86'
+
+    steps:
+    - bash: make
+      workingDirectory: $(Build.SourcesDirectory)/embedding
+    - bash: make test
+      workingDirectory: $(Build.SourcesDirectory)/embedding
+    - bash: make tar
+      workingDirectory: $(Build.SourcesDirectory)/embedding
