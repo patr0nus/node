@@ -28,16 +28,15 @@ UVPoller::UVPoller(uv_loop_t* loop) {
 
     if (loop->iocp && loop->iocp != INVALID_HANDLE_VALUE)
       CloseHandle(loop->iocp);
-    loop->iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 2);
+    loop->iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 2);
   }
-
 }
 
 UVPoller::~UVPoller() {
   uv_close(reinterpret_cast<uv_handle_t*>(&impl_->dummy_uv_handle_), nullptr);
 }
 
-void UVPoller::PollEvents() {  
+void UVPoller::PollEvents() {
   // If there are other kinds of events pending, uv_backend_timeout will
   // instruct us not to wait.
   DWORD bytes, timeout;
@@ -46,10 +45,11 @@ void UVPoller::PollEvents() {
 
   timeout = uv_backend_timeout(impl_->uv_loop_);
 
-  GetQueuedCompletionStatus(impl_->uv_loop_->iocp, &bytes, &key, &overlapped, timeout);
+  GetQueuedCompletionStatus(
+    impl_->uv_loop_->iocp, &bytes, &key, &overlapped, timeout);
 
   // Give the event back so libuv can deal with it.
-  if (overlapped != NULL)
+  if (overlapped != nullptr)
     PostQueuedCompletionStatus(impl_->uv_loop_->iocp, bytes, key, overlapped);
 }
 

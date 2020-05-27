@@ -5,21 +5,15 @@
 namespace node {
 namespace uv_poller {
 
-struct UVPoller::Impl {
-
-};
+struct UVPoller::Impl { };
 
 UVPoller::UVPoller(uv_loop_t* loop) {
   ABORT();
 }
 
-UVPoller::~UVPoller() {
+UVPoller::~UVPoller() { }
 
-}
-
-void UVPoller::PollEvents() {
-
-}
+void UVPoller::PollEvents() { }
 
 }  // namespace uv_poller
 }  // namespace node
