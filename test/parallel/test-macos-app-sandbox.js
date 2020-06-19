@@ -38,14 +38,17 @@ fs.copyFileSync(
 
 
 // Sign the app bundle with sandbox entitlements:
-assert.strictEqual(
-  child_process.spawnSync('/usr/bin/codesign', [
-    '--entitlements', fixtures.path(
-      'macos-app-sandbox', 'node_sandboxed.entitlements'),
-    '-s', '-',
-    appBundlePath
-  ]).status,
-  0);
+const codesignResult = child_process.spawnSync('/usr/bin/codesign', [
+  '--entitlements', fixtures.path(
+    'mac-app-sandbox', 'node_sandboxed.entitlements'),
+  '-s', '-',
+  appBundlePath]);
+
+console.error(codesignResult);
+console.error('stdout', codesignResult.stdout?.toString());
+console.error('stderr', codesignResult.stderr?.toString());
+
+assert.strictEqual(0, 1);
 
 // Sandboxed app shouldn't be able to read the home dir
 assert.notStrictEqual(
